@@ -1,0 +1,12 @@
+Service running at /etc/systemd/system/pcie-aspm.service
+[Unit]
+Description=Set PCIe ASPM Policy (Link State Power Management)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c "echo powersave | /usr/bin/tee /sys/module/pcie_aspm/parameters/policy"
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

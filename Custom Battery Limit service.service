@@ -1,0 +1,14 @@
+Service running at /etc/systemd/system/battery-threshold.service
+[Unit]
+Description=Set battery charge threshold for BAT1
+DefaultDependencies=no
+After=local-fs.target
+Before=sysinit.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c "echo 80 | /usr/bin/tee /sys/class/power_supply/BAT1/charge_control_end_threshold"
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target

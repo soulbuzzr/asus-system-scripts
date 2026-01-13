@@ -1,0 +1,14 @@
+Service running at /etc/systemd/system/cpupower-cap.service
+
+[Unit]
+Description=Set CPU frequency cap
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c '/usr/bin/cpupower frequency-set -g powersave && /usr/bin/cpupower frequency-set -d 1500MHz'
+
+[Install]
+WantedBy=multi-user.target
+
+

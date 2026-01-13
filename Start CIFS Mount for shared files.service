@@ -1,0 +1,25 @@
+Service running at /etc/systemd/system/mount-cifs.service
+
+[Unit]
+Description=Mount CIFS Share over Tailscale
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Wait indefinitely for Wi-Fi and internet
+ExecStartPre=/bin/bash -c 'echo "[mount-cifs] Waiting for network connectivity..."; \
+while true; do \
+  if nmcli -t -f WIFI g | grep -q "enabled" && ping -c1 -W2 100.96.0.105 >/dev/null 2>&1; then \
+    echo "[mount-cifs] Network and Internet are up."; \
+    exit 0; \
+  fi; \
+  echo "[mount-cifs] Network not ready, retrying in 5s..."; \
+  sleep 5; \
+done'
+ExecStart=/usr/sbin/mount.cifs  //100.96.0.105/data /net/shared_files -o username=hpserver,password=q,vers=3.0,uid=1000,gid=1000
+ExecStop=/bin/umount /net/shared_files
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
