@@ -1,7 +1,12 @@
-Add this respective scripts to cron to run all the time in background.
+Add this respective scripts to user cron to run all the time in background.
 # m h  dom mon dow   command
 * * * * * DISPLAY=:0 <dir>/low_memory_alert.sh 
 * * * * * DISPLAY=:0 <dir>/cpu_gpu_temp_alert.sh
 
+Add this to root cron:
+# m h  dom mon dow   command
+TG_CHAT_ID=***
+TG_BOT_TOKEN=***
+0 * * * * /home/sughosha/System_Scripts/system_health_telegram.sh
 
 Create a dir ~/.byobu/bin and add the file with a priority number. Lower number means higher prioity.

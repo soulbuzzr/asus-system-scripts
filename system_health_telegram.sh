@@ -15,7 +15,7 @@ UPTIME=$(uptime -p | sed 's/^up //')
 # ================= EMOJI HELPERS =================
 health_emoji() {
   if [ "$1" -ge 80 ]; then echo "🟢"
-  elif [ "$1" -ge 50 ]; then echo "🟡"
+  elif [ "$1" -ge 70 ]; then echo "🟡"
   else echo "🔴"; fi
 }
 
