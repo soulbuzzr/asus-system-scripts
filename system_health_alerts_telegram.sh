@@ -55,11 +55,6 @@ cpu_temp() {
   done
 }
 
-# ================= CPU ACTIVE =================
-get_cpu_active() {
-  mpstat 1 1 | awk '/Average/ {printf "%d",100-$NF}'
-}
-
 # ================= SSD NAME MAP =================
 declare -A SSD_NAME
 
