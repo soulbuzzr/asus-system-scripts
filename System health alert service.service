@@ -8,9 +8,6 @@ Wants=network-online.target
 Type=simple
 User=root
 
-# Delay start after network is up
-ExecStartPre=/bin/sleep 60
-
 # Telegram credentials
 Environment=TG_BOT_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 Environment=TG_CHAT_ID=xxxxxxxxx

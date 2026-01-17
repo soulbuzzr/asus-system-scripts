@@ -36,9 +36,11 @@ startup_notify() {
   MSG="✅ *SYSTEM MONITOR STARTED*
 Host: $HOSTNAME
 Monitoring:
-• CPU avg (1 min)
-• SSD temp (5 sec)
-• SSD health (5 min)
+- CPU avg (1 min)
+- SSD temp (5 sec)
+- SSD health (5 min)
+- Battery health (wear)
+- Battery charge level
 Time: $(date '+%F %T')"
 
   log "System monitor started"
@@ -157,11 +159,95 @@ Reallocated: ${REALLOC}%"
   done
 }
 
+# ================= BATTERY HELPERS =================
+battery_path() {
+  ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -n1
+}
+
+battery_present() {
+  [ -n "$(battery_path)" ]
+}
+
+battery_health_percent() {
+  local full design
+
+  full=$(cat "$(battery_path)/charge_full" 2>/dev/null) || return
+  design=$(cat "$(battery_path)/charge_full_design" 2>/dev/null) || return
+
+  # Sanity check
+  [ -n "$full" ] && [ -n "$design" ] && [ "$design" -gt 0 ] || return
+
+  # Integer math (no floats, no awk)
+  echo $(( full * 100 / design ))
+}
+
+battery_charge_percent() {
+  cat "$(battery_path)/capacity" 2>/dev/null
+}
+
+# ================= BATTERY HEALTH CHECK =================
+battery_health_check() {
+  battery_present || return
+
+  HEALTH=$(battery_health_percent)
+  [ -n "$HEALTH" ] || return
+
+  log "BATTERY_HEALTH=${HEALTH}%"
+
+  if [ "$HEALTH" -le "$BATTERY_HEALTH_CRIT" ]; then
+    MSG="🔴 *BATTERY HEALTH CRITICAL*
+Host: $HOSTNAME
+Battery Health: ${HEALTH}%"
+
+    log "$MSG"
+    tg_send "$MSG"
+
+  elif [ "$HEALTH" -le "$BATTERY_HEALTH_WARN" ]; then
+    MSG="🟡 *BATTERY HEALTH DEGRADED*
+Host: $HOSTNAME
+Battery Health: ${HEALTH}%"
+
+    log "$MSG"
+    tg_send "$MSG"
+  fi
+}
+
+# ================= BATTERY CHARGE CHECK =================
+battery_charge_check() {
+  battery_present || return
+
+  CHARGE=$(battery_charge_percent)
+  [ -n "$CHARGE" ] || return
+
+  log "BATTERY_CHARGE=${CHARGE}%"
+
+  if [ "$CHARGE" -le "$BATTERY_CHARGE_CRIT" ]; then
+    MSG="🔴 *BATTERY CHARGE CRITICAL*
+Host: $HOSTNAME
+Charge Level: ${CHARGE}%"
+
+    log "$MSG"
+    tg_send "$MSG"
+
+  elif [ "$CHARGE" -le "$BATTERY_CHARGE_WARN" ]; then
+    MSG="🟡 *BATTERY CHARGE LOW*
+Host: $HOSTNAME
+Charge Level: ${CHARGE}%"
+
+    log "$MSG"
+    tg_send "$MSG"
+  fi
+}
+
 # ================= MAIN LOOP =================
+
+sleep 60 # Wait for 1 min to fire the startup msg
 startup_notify
 
 CPU_TIMER=0
 SSD_HEALTH_TIMER=0
+BATTERY_HEALTH_TIMER=0
+BATTERY_CHARGE_TIMER=0
 
 while true; do
   ssd_temp_check
@@ -176,7 +262,19 @@ while true; do
     SSD_HEALTH_TIMER=0
   fi
 
+  if (( BATTERY_HEALTH_TIMER >= BATTERY_HEALTH_INTERVAL )); then
+    battery_health_check
+    BATTERY_HEALTH_TIMER=0
+  fi
+
+  if (( BATTERY_CHARGE_TIMER >= BATTERY_CHECK_INTERVAL )); then
+    battery_charge_check
+    BATTERY_CHARGE_TIMER=0
+  fi
+
   sleep 5
   CPU_TIMER=$((CPU_TIMER + 5))
   SSD_HEALTH_TIMER=$((SSD_HEALTH_TIMER + 5))
+  BATTERY_HEALTH_TIMER=$((BATTERY_HEALTH_TIMER + 5))
+  BATTERY_CHARGE_TIMER=$((BATTERY_CHARGE_TIMER + 5))
 done
