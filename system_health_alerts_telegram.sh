@@ -234,9 +234,19 @@ Charge Level: ${CHARGE}%"
   fi
 }
 
+# ================= CONNECTIVITY CHECK =================
+internet_up() {
+  ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1
+}
+
 # ================= MAIN LOOP =================
 
-sleep 60 # Wait for 1 min to fire the startup msg
+until internet_up; do
+  log "Waiting for internet before startup notify..."
+  sleep 5
+done
+
+log "Internet is up, sending startup notify..."
 startup_notify
 
 CPU_TIMER=0

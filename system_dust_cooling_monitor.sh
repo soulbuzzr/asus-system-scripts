@@ -95,6 +95,18 @@ cpu_sample_60s() {
   echo "$CPU_ACTIVE $CPU_TEMP"
 }
 
+# ================= CONNECTIVITY CHECK =================
+internet_up() {
+  ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1
+}
+
+until internet_up; do
+  log "Waiting for internet before startup notify..."
+  sleep 5
+done
+
+log "Internet is up, starting dust / cooling monitor..."
+
 # ================= STARTUP =================
 log "Dust / cooling monitor started"
 sleep 60
