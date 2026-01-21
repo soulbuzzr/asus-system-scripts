@@ -247,6 +247,7 @@ until internet_up; do
 done
 
 log "Internet is up, sending startup notify..."
+sleep 60
 startup_notify
 
 CPU_TIMER=0
