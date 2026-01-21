@@ -35,8 +35,11 @@ cpu_emoji() {
 read CPU_US CPU_SY CPU_NI CPU_ID CPU_WA CPU_HI CPU_SI CPU_ST <<< \
 $(top -bn1 | awk '/Cpu\(s\)/ {print $2,$4,$6,$8,$10,$12,$14,$16}')
 
-CPU_ACTIVE=$(awk -v id="$CPU_ID" 'BEGIN {printf "%.1f",100-id}')
-CPU_E=$(cpu_emoji "${CPU_ACTIVE%.*}")
+CPU_ACTIVE=$(mpstat 1 60 | awk '/Average/ {printf "%.2f",100-$NF}')
+
+# extract integer part for emoji logic
+CPU_INT=${CPU_ACTIVE%.*}
+CPU_E=$(cpu_emoji "$CPU_INT")
 
 # ================= NVME DEVICE SCAN =================
 get_nvme_devices() {
@@ -92,7 +95,8 @@ MSG="*$HOST*
   $UPTIME
 
 🧮 *CPU*
-    • Active CPU Usage: $CPU_ACTIVE% $CPU_E
+    • Active CPU Usage (1 min avg): $CPU_ACTIVE% $CPU_E
+    Live CPU Usage stats:
     • Applications (User): $CPU_US%
     • Kernel / OS (System): $CPU_SY%
     • Low-priority Tasks: $CPU_NI%
