@@ -41,6 +41,25 @@ CPU_ACTIVE=$(mpstat 1 60 | awk '/Average/ {printf "%.2f",100-$NF}')
 CPU_INT=${CPU_ACTIVE%.*}
 CPU_E=$(cpu_emoji "$CPU_INT")
 
+# ================= NVIDIA GPU =================
+get_nvidia_temp() {
+  command -v nvidia-smi >/dev/null 2>&1 || return 1
+  nvidia-smi --query-gpu=temperature.gpu \
+             --format=csv,noheader,nounits 2>/dev/null | head -n1
+}
+
+NVIDIA_BLOCK=""
+
+if GPU_TEMP=$(get_nvidia_temp); then
+  if [[ "$GPU_TEMP" =~ ^[0-9]+$ ]]; then
+    GPU_E=$(temp_emoji "$GPU_TEMP")
+    NVIDIA_BLOCK="🎮 *NVIDIA GPU*
+    • 🌡️ Temp: *$GPU_TEMP°C* *$GPU_E*
+
+"
+  fi
+fi
+
 # ================= NVME DEVICE SCAN =================
 get_nvme_devices() {
   smartctl --scan | awk '{print $1}' | grep nvme
@@ -75,9 +94,9 @@ for DEV in $(get_nvme_devices); do
   HEALTH_E=$(health_emoji "$HEALTH")
 
   NVME_BLOCK+="📀 *$NAME*
-    • 🌡️ Temp: $TEMP°C $TEMP_E
-    • ❤️ Health: $HEALTH% $HEALTH_E
-    • ♻️ Reallocated: $REALLOC%
+    • 🌡️ Temp: *$TEMP°C* *$TEMP_E*
+    • ❤️ Health: *$HEALTH%* *$HEALTH_E*
+    • ♻️ Reallocated blocks: *$REALLOC*
 "$'\n'
 done
 
@@ -92,10 +111,10 @@ $(free -h | awk '/Swap:/ {print $4}')
 MSG="*$HOST*
 
 ⏱️ *Uptime*
-  $UPTIME
+  *$UPTIME*
 
 🧮 *CPU*
-    • Active CPU Usage (1 min avg): $CPU_ACTIVE% $CPU_E
+    • Active CPU Usage (1 min avg): *$CPU_ACTIVE%* *$CPU_E*
     Live CPU Usage stats:
     • Applications (User): $CPU_US%
     • Kernel / OS (System): $CPU_SY%
@@ -106,13 +125,13 @@ MSG="*$HOST*
     • Software Interrupts: $CPU_SI%
     • Virtualization Steal Time: $CPU_ST%
 
-$NVME_BLOCK🧠 *Memory*
-    • Used: $RAM_USED ($RAM_PCT%)
-    • Available: $RAM_AVAIL
-    • Total: $RAM_TOTAL
+$NVME_BLOCK$NVIDIA_BLOCK🧠 *Memory*
+    • Used: *$RAM_USED* *($RAM_PCT%)*
+    • Available: *$RAM_AVAIL*
+    • Total: *$RAM_TOTAL*
 
 💾 *Swap*
-    • Available: $SWAP_AVAIL
+    • Available: *$SWAP_AVAIL*
 
 🕒 *$TS*"
 
