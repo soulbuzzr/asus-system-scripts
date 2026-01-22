@@ -5,7 +5,7 @@ set -euo pipefail
 # Telegram notification integration (from cron env)
 : "${TG_BOT_TOKEN:?TG_BOT_TOKEN not set}"
 : "${TG_CHAT_ID:?TG_CHAT_ID not set}"
-LOG_FILE="/var/log/system_health.log"
+LOG_FILE="/var/log/system_health_hourly_stats.log"
 
 # ================= BASICS =================
 HOST='💻  ASUS Linux Workstation'
