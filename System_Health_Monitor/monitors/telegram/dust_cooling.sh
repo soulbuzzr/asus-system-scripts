@@ -3,7 +3,7 @@ set -u
 set -o pipefail
 
 # ================= LOAD SHARED LIB =================
-source "$HOME/System_scripts/System_Health_Monitor/lib/health_lib.sh"
+source "$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
 
 # ================= VALIDATION =================
 : "${DUST_CPU_ACTIVE_MAX:?Missing DUST_CPU_ACTIVE_MAX}"

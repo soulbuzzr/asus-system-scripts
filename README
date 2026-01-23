@@ -9,4 +9,42 @@ TG_CHAT_ID=***
 TG_BOT_TOKEN=***
 0 * * * * /home/sughosha/System_Scripts/system_health_telegram.sh
 
-Create a dir ~/.byobu/bin and add the file with a priority number. Lower number means higher prioity.
+Create ONE template service
+📄 /etc/systemd/system/system-health-alerts@.service
+[Unit]
+Description=System Health Alert (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+
+# Explicit environment (robust under systemd)
+Environment=HOME=/home/sughosha
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# %i expands to instance name
+ExecStart=/home/sughosha/System_Scripts/System_Health_Monitor/monitors/telegram/%i.sh
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+
+
+Enable all monitors using the template
+Enable + start ALL at once
+sudo systemctl daemon-reload
+
+sudo systemctl enable --now \
+  system-health-alerts@battery_monitor.service \
+  system-health-alerts@cpu_load.service \
+  system-health-alerts@cpu_temp.service \
+  system-health-alerts@gpu_temp.service \
+  system-health-alerts@nvme_ssd_health.service \
+  system-health-alerts@nvme_ssd_temp.service \
+  system-health-alerts@dust_cooling.service
+
+systemctl status system-health-alerts@*
