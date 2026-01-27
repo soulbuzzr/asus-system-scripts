@@ -23,17 +23,30 @@ done
 
 sleep 60
 
+# ================= NVME DEVICE SCAN (SAME AS HOURLY SCRIPT) =================
+get_nvme_devices() {
+  smartctl --scan | awk '{print $1}' | grep nvme
+}
+
+# ================= FRIENDLY NAME (SAME LOGIC) =================
+friendly_name() {
+  smartctl -a "$1" 2>/dev/null | awk '
+    /Model Number/ && /PM9A1/       {print "Samsung PCIe Gen4 SSD"}
+    /Model Number/ && /CT.*P3/      {print "Crucial PCIe Gen3 SSD"}
+  '
+}
+
 # ================= SSD NAME MAP =================
 declare -A SSD_NAME
 
-for DEVN in /dev/nvme*n1; do
-  [ -e "$DEVN" ] || continue
-  CTRL="/dev/$(basename "$DEVN" | sed 's/n1//')"
+for DEVN in $(get_nvme_devices); do
+  # Convert namespace → controller
+  CTRL="/dev/$(basename "$DEVN" | sed 's/n[0-9]*$//')"
 
-  SSD_NAME["$CTRL"]=$(smartctl -a "$DEVN" | awk '
-    /Model Number/ && /PM9A1/       {print "Samsung PCIe Gen4 SSD"}
-    /Model Number/ && /CT.*P3/      {print "Crucial PCIe Gen3 SSD"}
-  ')
+  NAME=$(friendly_name "$DEVN")
+  [ -z "$NAME" ] && continue
+
+  SSD_NAME["$CTRL"]="$NAME"
 done
 
 # ================= THRESHOLD MAPPER =================
@@ -54,7 +67,7 @@ get_health_thresholds() {
 # ================= STARTUP NOTIFY =================
 STARTUP_MSG="✅ *NVMe SSD Health Monitor Active*
 $HOST_NAME
-Monitoring: *NVMe health & spare blocks*
+Monitoring: *NVMe health and spare blocks*
 Interval: *5 minutes*"
 
 log SSD "NVMe SSD health monitor started"
@@ -62,11 +75,8 @@ tg_send "$STARTUP_MSG"
 
 # ================= CONTINUOUS MONITOR =================
 while true; do
-  for DEV in /dev/nvme*; do
-    [ -e "$DEV" ] || continue
-    [[ "$DEV" =~ n1$ ]] && continue   # skip namespaces here
-
-    NAME="${SSD_NAME[$DEV]:-$DEV}"
+  for DEV in "${!SSD_NAME[@]}"; do
+    NAME="${SSD_NAME[$DEV]}"
 
     read WARN CRIT <<< "$(get_health_thresholds "$NAME")"
 
