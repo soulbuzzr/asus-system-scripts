@@ -23,12 +23,12 @@ done
 
 sleep 60
 
-# ================= NVME DEVICE SCAN (SAME AS HOURLY SCRIPT) =================
+# ================= NVME DEVICE SCAN =================
 get_nvme_devices() {
   smartctl --scan | awk '{print $1}' | grep nvme
 }
 
-# ================= FRIENDLY NAME (SAME LOGIC) =================
+# ================= FRIENDLY NAME =================
 friendly_name() {
   smartctl -a "$1" 2>/dev/null | awk '
     /Model Number/ && /PM9A1/       {print "Samsung PCIe Gen4 SSD"}
@@ -40,12 +40,9 @@ friendly_name() {
 declare -A SSD_NAME
 
 for DEVN in $(get_nvme_devices); do
-  # Convert namespace → controller
   CTRL="/dev/$(basename "$DEVN" | sed 's/n[0-9]*$//')"
-
   NAME=$(friendly_name "$DEVN")
   [ -z "$NAME" ] && continue
-
   SSD_NAME["$CTRL"]="$NAME"
 done
 
