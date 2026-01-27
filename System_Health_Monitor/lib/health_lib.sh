@@ -49,3 +49,54 @@ tg_send() {
 internet_up() {
   ping -c1 -W1 8.8.8.8 >/dev/null 2>&1
 }
+
+# ================= NVME DISCOVERY =================
+get_nvme_devices() {
+  smartctl --scan 2>/dev/null | awk '{print $1}' | grep -E '^/dev/nvme'
+}
+
+# ================= SSD MODEL NAME =================
+ssd_model_name() {
+  local dev="$1"
+
+  nvme id-ctrl "$dev" 2>/dev/null \
+    | awk -F: '/^mn/ {gsub(/^[ \t]+/,"",$2); print $2; exit}'
+}
+
+# ================= SSD FRIENDLY NAME =================
+ssd_friendly_name() {
+  local dev="$1"
+  local model
+
+  model=$(ssd_model_name "$dev")
+
+  case "$model" in
+    *PM9A1*)
+      echo "Samsung PCIe Gen4 SSD"
+      ;;
+    *CT*P3*)
+      echo "Crucial PCIe Gen3 SSD"
+      ;;
+    *)
+      echo "${model:-$dev}"
+      ;;
+  esac
+}
+
+# ================= SSD HEALTH =================
+ssd_health_percent() {
+  nvme smart-log "$1" 2>/dev/null \
+    | awk -F'[:%]' '/^percentage_used/ {print 100-$2}'
+}
+
+# ================= SSD SPARE USED =================
+ssd_spare_used() {
+  nvme smart-log "$1" 2>/dev/null \
+    | awk -F'[:%]' '/^available_spare/&&!/_threshold/ {print 100-$2}'
+}
+
+# ================= SSD TEMP =================
+ssd_temperature() {
+  nvme smart-log "$1" 2>/dev/null \
+    | awk -F'[(:]' '/^temperature/ {print $2+0}'
+}

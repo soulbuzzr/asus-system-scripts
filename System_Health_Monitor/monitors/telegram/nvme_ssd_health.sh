@@ -23,30 +23,7 @@ done
 
 sleep 60
 
-# ================= NVME DEVICE SCAN =================
-get_nvme_devices() {
-  smartctl --scan | awk '{print $1}' | grep nvme
-}
-
-# ================= FRIENDLY NAME =================
-friendly_name() {
-  smartctl -a "$1" 2>/dev/null | awk '
-    /Model Number/ && /PM9A1/       {print "Samsung PCIe Gen4 SSD"}
-    /Model Number/ && /CT.*P3/      {print "Crucial PCIe Gen3 SSD"}
-  '
-}
-
-# ================= SSD NAME MAP =================
-declare -A SSD_NAME
-
-for DEVN in $(get_nvme_devices); do
-  CTRL="/dev/$(basename "$DEVN" | sed 's/n[0-9]*$//')"
-  NAME=$(friendly_name "$DEVN")
-  [ -z "$NAME" ] && continue
-  SSD_NAME["$CTRL"]="$NAME"
-done
-
-# ================= THRESHOLD MAPPER =================
+# ================= THRESHOLDS =================
 get_health_thresholds() {
   case "$1" in
     *Samsung*)
@@ -62,57 +39,43 @@ get_health_thresholds() {
 }
 
 # ================= STARTUP NOTIFY =================
-STARTUP_MSG="✅ *NVMe SSD Health Monitor Active*
+log SSD "NVMe SSD health monitor started"
+tg_send "✅ *NVMe SSD Health Monitor Active*
 $HOST_NAME
-Monitoring: *NVMe health and spare blocks*
 Interval: *5 minutes*"
 
-log SSD "NVMe SSD health monitor started"
-tg_send "$STARTUP_MSG"
-
-# ================= CONTINUOUS MONITOR =================
+# ================= MAIN LOOP =================
 while true; do
-  for DEV in "${!SSD_NAME[@]}"; do
-    NAME="${SSD_NAME[$DEV]}"
-
+  for DEV in $(get_nvme_devices); do
+    NAME=$(ssd_friendly_name "$DEV")
     read WARN CRIT <<< "$(get_health_thresholds "$NAME")"
 
-    HEALTH=$(nvme smart-log "$DEV" \
-      | awk -F'[:%]' '/^percentage_used/ {print 100-$2}')
+    HEALTH=$(ssd_health_percent "$DEV")
+    SPARE_USED=$(ssd_spare_used "$DEV")
 
-    REALLOC=$(nvme smart-log "$DEV" \
-      | awk -F'[:%]' '/^available_spare/&&!/_threshold/ {print 100-$2}')
-
-    log SSD "[$NAME] health=${HEALTH}% spare_loss=${REALLOC}%"
+    log SSD "[$NAME] health=${HEALTH}% spare_used=${SPARE_USED}%"
 
     if (( HEALTH < WARN && HEALTH >= CRIT )); then
-      MSG="🟡 *SSD HEALTH DEGRADED*
+      tg_send "🟡 *SSD HEALTH DEGRADED*
 $HOST_NAME
-Drive: $NAME
-Health Remaining: *${HEALTH}%*"
-
-      log SSD "DEGRADED: $NAME (${HEALTH}%)"
-      tg_send "$MSG"
+Drive: *$NAME*
+Health Remaining: *${HEALTH}%*
+Threshold: *${WARN}%*"
     fi
 
     if (( HEALTH < CRIT )); then
-      MSG="🔴 *CRITICAL SSD HEALTH*
+      tg_send "🔴 *CRITICAL SSD HEALTH*
 $HOST_NAME
-Drive: $NAME
-Health Remaining: *${HEALTH}%*"
-
-      log SSD "CRITICAL: $NAME (${HEALTH}%)"
-      tg_send "$MSG"
+Drive: *$NAME*
+Health Remaining: *${HEALTH}%*
+Threshold: *${CRIT}%*"
     fi
 
-    if (( REALLOC > 0 )); then
-      MSG="🚨 *SSD FAILED BLOCKS*
+    if (( SPARE_USED > 0 )); then
+      tg_send "🚨 *SSD FAILED BLOCKS*
 $HOST_NAME
-Drive: $NAME
-Spare Used: *${REALLOC}%*"
-
-      log SSD "FAILED BLOCKS: $NAME (${REALLOC}%)"
-      tg_send "$MSG"
+Drive: *$NAME*
+Spare Used: *${SPARE_USED}%*"
     fi
   done
 
