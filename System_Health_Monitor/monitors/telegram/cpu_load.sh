@@ -2,6 +2,7 @@
 set -u
 set -o pipefail
 
+# ================= LOAD SHARED LIB =================
 source "$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
 
 # ================= VALIDATION =================

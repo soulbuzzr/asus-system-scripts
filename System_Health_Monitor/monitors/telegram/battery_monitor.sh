@@ -53,15 +53,28 @@ $HOST_NAME
 
 Monitoring:
 • Battery health (wear)
-• Battery charge level"
+• Battery charge level
+Polling interval: *1 minute*"
 
-# ================= TIMERS =================
+# ================= TIMERS (SECONDS) =================
 BATTERY_HEALTH_TIMER=0
 BATTERY_CHARGE_TIMER=0
 
 # ================= MAIN LOOP =================
 while true; do
-  battery_present || sleep 30 && continue
+  if ! battery_present; then
+    log BATTERY "No battery detected – exiting monitor"
+
+    tg_send "⚠️ *BATTERY NOT DETECTED*
+$HOST_NAME
+
+No battery device found.
+This system appears to be a desktop or battery is unavailable.
+
+*Battery monitor exiting.*"
+
+    exit 0
+  fi
 
   # -------- Battery health --------
   if (( BATTERY_HEALTH_TIMER >= BATTERY_HEALTH_INTERVAL )); then
@@ -72,14 +85,16 @@ while true; do
       if (( HEALTH <= BATTERY_HEALTH_CRIT )); then
         tg_send "🔴 *BATTERY HEALTH CRITICAL*
 $HOST_NAME
-Battery Health: *${HEALTH}%*"
+Battery Health: *${HEALTH}%*
+Threshold: *${BATTERY_HEALTH_CRIT}%*"
 
         log BATTERY "ALERT: health critical (${HEALTH}%)"
 
       elif (( HEALTH <= BATTERY_HEALTH_WARN )); then
         tg_send "🟡 *BATTERY HEALTH DEGRADED*
 $HOST_NAME
-Battery Health: *${HEALTH}%*"
+Battery Health: *${HEALTH}%*
+Threshold: *${BATTERY_HEALTH_WARN}%*"
 
         log BATTERY "ALERT: health degraded (${HEALTH}%)"
       fi
@@ -96,14 +111,16 @@ Battery Health: *${HEALTH}%*"
       if (( CHARGE <= BATTERY_CHARGE_CRIT )); then
         tg_send "🔴 *BATTERY CHARGE CRITICAL*
 $HOST_NAME
-Charge Level: *${CHARGE}%*"
+Charge Level: *${CHARGE}%*
+Threshold: *${BATTERY_CHARGE_CRIT}%*"
 
         log BATTERY "ALERT: charge critical (${CHARGE}%)"
 
       elif (( CHARGE <= BATTERY_CHARGE_WARN )); then
         tg_send "🟡 *BATTERY CHARGE LOW*
 $HOST_NAME
-Charge Level: *${CHARGE}%*"
+Charge Level: *${CHARGE}%*
+Threshold: *${BATTERY_CHARGE_WARN}%*"
 
         log BATTERY "ALERT: charge low (${CHARGE}%)"
       fi
@@ -111,7 +128,7 @@ Charge Level: *${CHARGE}%*"
     BATTERY_CHARGE_TIMER=0
   fi
 
-  sleep 5
-  BATTERY_HEALTH_TIMER=$((BATTERY_HEALTH_TIMER + 5))
-  BATTERY_CHARGE_TIMER=$((BATTERY_CHARGE_TIMER + 5))
+  sleep 60
+  BATTERY_HEALTH_TIMER=$((BATTERY_HEALTH_TIMER + 60))
+  BATTERY_CHARGE_TIMER=$((BATTERY_CHARGE_TIMER + 60))
 done
