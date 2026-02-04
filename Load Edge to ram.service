@@ -1,0 +1,30 @@
+Service running at /etc/systemd/system/load-edge-to-ram.service
+[Unit]
+Description=Load Microsoft Edge profile into RAM and create symlink
+After=start-ramdisk.service
+Requires=start-ramdisk.service
+
+[Service]
+Type=oneshot
+User=sughosha
+Group=sughosha
+RemainAfterExit=yes
+
+# Ensure RAM profile directory exists
+ExecStart=/bin/mkdir -p /home/sughosha/Ramdisk/edge-profile
+ExecStart=/bin/chmod 0700 /home/sughosha/Ramdisk/edge-profile
+
+# Remove existing Edge config
+ExecStart=/bin/bash -c 'rm -rf /home/sughosha/.config/microsoft-edge'
+
+# Create / fix symlink
+ExecStart=/bin/ln -snf /home/sughosha/Ramdisk/edge-profile /home/sughosha/.config/microsoft-edge
+
+# Restore Edge profile contents from SSD
+ExecStart=/usr/bin/rsync -a /home/sughosha/.config/microsoft-edge.ssd/ /home/sughosha/Ramdisk/edge-profile/
+
+# Cleanup on stop
+ExecStop=/bin/bash -c 'rm -rf /home/sughosha/Ramdisk/edge-profile'
+
+[Install]
+WantedBy=multi-user.target

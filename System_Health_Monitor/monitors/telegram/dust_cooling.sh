@@ -89,10 +89,10 @@ tg_send "🧹 *Dust / Cooling Monitor Started*
 $HOST_NAME
 
 Thresholds:
-• CPU active (median) < ${DUST_CPU_ACTIVE_MAX}%
-• Temp (median) > ${DUST_CPU_TEMP_MIN}°C
-• Temp stability (MAD) ≤ ${DUST_CPU_TEMP_MAD_MAX}°C
-• Window: ${DUST_DETECT_DURATION} minutes"
+• CPU active (median) < *${DUST_CPU_ACTIVE_MAX}%*
+• Temp (median) > *${DUST_CPU_TEMP_MIN}°C*
+• Temp stability (MAD) ≤ *${DUST_CPU_TEMP_MAD_MAX}°C*
+• Window: *${DUST_DETECT_DURATION} minutes*"
 
 # ================= MAIN LOOP =================
 CPU_ACTIVE_BUF=()

@@ -1,0 +1,30 @@
+Service running at /etc/systemd/system/load-chrome-to-ram.service
+[Unit]
+Description=Load Chrome profile into RAM and create symlink
+After=start-ramdisk.service
+Requires=start-ramdisk.service
+
+[Service]
+Type=oneshot
+User=sughosha
+Group=sughosha
+RemainAfterExit=yes
+
+# Ensure RAM profile directory exists
+ExecStart=/bin/mkdir -p /home/sughosha/Ramdisk/chrome-profile
+ExecStart=/bin/chmod 0700 /home/sughosha/Ramdisk/chrome-profile
+
+# Remove existing chrome config only if it's not already the correct symlink
+ExecStart=/bin/bash -c 'rm -rf /home/sughosha/.config/google-chrome'
+
+# Create / fix symlink
+ExecStart=/bin/ln -snf /home/sughosha/Ramdisk/chrome-profile /home/sughosha/.config/google-chrome
+
+# Restore Chrome profile contents
+ExecStart=/usr/bin/rsync -a /home/sughosha/.config/google-chrome.ssd/ /home/sughosha/Ramdisk/chrome-profile/
+
+# Cleanup 
+ExecStop=/bin/bash -c 'rm -rf /home/sughosha/Ramdisk/chrome-profile'
+
+[Install]
+WantedBy=multi-user.target

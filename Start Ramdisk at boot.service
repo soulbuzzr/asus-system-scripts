@@ -1,0 +1,17 @@
+Service running at /etc/systemd/system/start-ramdisk.service
+[Unit]
+Description=Mount tmpfs Ramdisk at /home/sughosha/Ramdisk
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+ExecStart=/bin/mount -t tmpfs -o rw,nosuid,nodev,noatime,size=20G tmpfs /home/sughosha/Ramdisk
+ExecStartPost=/bin/chown sughosha:sughosha /home/sughosha/Ramdisk
+ExecStartPost=/bin/chmod 0700 /home/sughosha/Ramdisk
+
+ExecStop=/bin/umount /home/sughosha/Ramdisk
+
+[Install]
+WantedBy=multi-user.target
