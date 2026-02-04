@@ -18,13 +18,10 @@ BOOT_FILE="${STATE_DIR}/boot.json"
 NVME_DEVS=(/dev/nvme0n1 /dev/nvme1n1)
 
 # ────────────────────────────────────────────────
-# Load Telegram env (required)
+# Load Telegram env
 # ────────────────────────────────────────────────
-if [[ -f "$ENV_FILE" ]]; then
-  source "$ENV_FILE"
-else
-  exit 0
-fi
+[[ -f "$ENV_FILE" ]] || exit 0
+source "$ENV_FILE"
 
 : "${TG_BOT_TOKEN:?TG_BOT_TOKEN missing}"
 : "${TG_CHAT_ID:?TG_CHAT_ID missing}"
@@ -32,11 +29,8 @@ fi
 # ────────────────────────────────────────────────
 # Load system config (optional)
 # ────────────────────────────────────────────────
-if [[ -f "$CONF_FILE" ]]; then
-  source "$CONF_FILE"
-fi
+[[ -f "$CONF_FILE" ]] && source "$CONF_FILE"
 
-# Safe fallback
 HOST_DISPLAY="${HOST_NAME:-🖥 $(hostname)}"
 
 mkdir -p "$STATE_DIR"
@@ -44,6 +38,30 @@ mkdir -p "$STATE_DIR"
 # ────────────────────────────────────────────────
 # Helpers
 # ────────────────────────────────────────────────
+ssd_model_name() {
+  local dev="$1"
+  smartctl -a "$dev" 2>/dev/null | awk -F: '/Model Number/ {print $2}' | xargs
+}
+
+ssd_friendly_name() {
+  local dev="$1"
+  local model
+
+  model=$(ssd_model_name "$dev")
+
+  case "$model" in
+    *PM9A1*)
+      echo "Samsung PCIe Gen4 SSD"
+      ;;
+    *CT*P3*)
+      echo "Crucial PCIe Gen3 SSD"
+      ;;
+    *)
+      echo "${model:-$dev}"
+      ;;
+  esac
+}
+
 get_written_units() {
   smartctl -a "$1" 2>/dev/null |
     awk -F: '/Data Units Written/ {print $2}' |
@@ -95,9 +113,9 @@ if [[ "$MODE" == "shutdown" ]]; then
     exit 0
   fi
 
-  report="📊 *SSD Daily Write Report*
+  report="*📊 SSD Daily Write Report*
 *${HOST_DISPLAY}*
-🕒 $(date)
+*🕒 $(date)*
 
 "
 
@@ -112,17 +130,18 @@ if [[ "$MODE" == "shutdown" ]]; then
 
     delta=$((shut_val - boot_val))
 
-    # NVMe spec: 1 Data Unit = 512,000 bytes
     gb=$(awk "BEGIN {printf \"%.2f\", $delta * 512000 / 1000 / 1000 / 1000}")
 
-    report+="💽 $dev
+    name=$(ssd_friendly_name "$dev")
+
+    report+="💽 ${name}
   Writes today: ${gb} GB
 
 "
     total_gb=$(awk "BEGIN {printf \"%.2f\", $total_gb + $gb}")
   done
 
-  report+="📦 Total SSD Writes Today: ${total_gb} GB"
+  report+="*📦 Total SSD Writes Today: ${total_gb} GB*"
 
-  send_telegram "*$report*"
+  send_telegram "$report"
 fi
