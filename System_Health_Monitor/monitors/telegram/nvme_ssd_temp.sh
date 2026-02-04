@@ -36,7 +36,7 @@ while true; do
 
     log SSD_TEMP "[$NAME] temp=${TEMP}C"
 
-    if (( TEMP >= SSD_TEMP_WARN )); then
+    if (( TEMP > SSD_TEMP_WARN )); then
       tg_send "⚠️ *SSD TEMP HIGH*
 $HOST_NAME
 Drive: *$NAME*
