@@ -37,13 +37,10 @@ while true; do
     log SSD_TEMP "[$NAME] temp=${TEMP}C"
 
     if (( TEMP >= SSD_TEMP_WARN )); then
-      HEALTH=$(ssd_health_percent "$DEV")
-
       tg_send "⚠️ *SSD TEMP HIGH*
 $HOST_NAME
 Drive: *$NAME*
 Temperature: *${TEMP}°C*
-Health Remaining: *${HEALTH:-N/A}%*
 Threshold: *${SSD_TEMP_WARN}°C*"
     fi
   done
