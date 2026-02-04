@@ -2,6 +2,11 @@
 set -u
 set -o pipefail
 
+# ================= RESOLVE HOME DIRECTORY for root user =================
+if [[ "$HOME" == "/root" ]]; then
+  HOME="/home/sughosha"
+fi
+
 BASE_DIR="$HOME/System_Scripts/System_Health_Monitor"
 ENV_FILE="$BASE_DIR/env/system_health_bot.env"
 CONF_FILE="$BASE_DIR/conf/system_limits.conf"
