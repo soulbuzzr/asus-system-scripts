@@ -1,42 +1,32 @@
 #!/usr/bin/env bash
 # SSD Write Report at BOOT (NVMe SMART based)
 # Reports writes since LAST BOOT in GB
+# Uses SSD MODEL NAME as identity (safe against nvme reordering)
 
 set -u
+
+# ================= RESOLVE HOME DIRECTORY for root user (for cron) =================
+if [[ "$HOME" == "/root" ]]; then
+  HOME="/home/sughosha"
+fi
 
 # ────────────────────────────────────────────────
 # Config files
 # ────────────────────────────────────────────────
-ENV_FILE="/home/sughosha/System_Scripts/System_Health_Monitor/env/system_health_bot.env"
-CONF_FILE="/home/sughosha/System_Scripts/System_Health_Monitor/conf/system_limits.conf"
-LIB_MODULE="/home/sughosha/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
+LIB_MODULE="$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
 
-STATE_DIR="/home/sughosha/System_Scripts"
+STATE_DIR="$HOME/System_Scripts"
 STATE_FILE="${STATE_DIR}/last_boot.json"
 
 NVME_DEVS=(/dev/nvme0n1 /dev/nvme1n1)
 
 # ────────────────────────────────────────────────
-# Load Telegram env
-# ────────────────────────────────────────────────
-[[ -f "$ENV_FILE" ]] || exit 0
-source "$ENV_FILE"
-
-: "${TG_BOT_TOKEN:?TG_BOT_TOKEN missing}"
-: "${TG_CHAT_ID:?TG_CHAT_ID missing}"
-
-# ────────────────────────────────────────────────
-# Load system config (optional)
-# ────────────────────────────────────────────────
-[[ -f "$CONF_FILE" ]] && source "$CONF_FILE"
-HOST_DISPLAY="${HOST_NAME:-🖥 $(hostname)}"
-
-mkdir -p "$STATE_DIR"
-
-# ────────────────────────────────────────────────
 # Load shared Library module
 # ────────────────────────────────────────────────
 [[ -f "$LIB_MODULE" ]] && source "$LIB_MODULE"
+HOST_DISPLAY="${HOST_NAME:-🖥 $(hostname)}"
+
+mkdir -p "$STATE_DIR"
 
 # ================= WAIT FOR NETWORK =================
 until internet_up; do
@@ -44,6 +34,7 @@ until internet_up; do
   sleep 5
 done
 
+sleep 75
 # ────────────────────────────────────────────────
 # Helpers
 # ────────────────────────────────────────────────
@@ -52,13 +43,11 @@ ssd_model_name() {
 }
 
 ssd_friendly_name() {
-  local model
-  model=$(ssd_model_name "$1")
-
+  local model="$1"
   case "$model" in
     *PM9A1*) echo "Samsung PCIe Gen4 SSD" ;;
     *CT*P3*) echo "Crucial PCIe Gen3 SSD" ;;
-    *)       echo "${model:-$1}" ;;
+    *)       echo "$model" ;;
   esac
 }
 
@@ -82,18 +71,17 @@ send_telegram() {
 }
 
 # ────────────────────────────────────────────────
-# Load previous boot state
+# Load previous boot state (MODEL → value)
 # ────────────────────────────────────────────────
 declare -A PREV
 declare -A CURRENT
 
 if [[ -f "$STATE_FILE" ]] && jq . "$STATE_FILE" >/dev/null 2>&1; then
-  for dev in "${NVME_DEVS[@]}"; do
-    val=$(jq -r ".\"$dev\" // empty" "$STATE_FILE")
-    if is_number "$val"; then
-      PREV["$dev"]="$val"
+  while IFS="=" read -r model val; do
+    if [[ -n "$model" ]] && is_number "$val"; then
+      PREV["$model"]="$val"
     fi
-  done
+  done < <(jq -r 'to_entries[] | "\(.key)=\(.value)"' "$STATE_FILE")
 fi
 
 # ────────────────────────────────────────────────
@@ -110,15 +98,21 @@ total_gb=0
 for dev in "${NVME_DEVS[@]}"; do
   curr=$(get_written_units "$dev")
   is_number "$curr" || continue
-  CURRENT["$dev"]="$curr"
 
-  prev="${PREV[$dev]:-}"
+  model=$(ssd_model_name "$dev")
+  [[ -n "$model" ]] || continue
+
+  CURRENT["$model"]="$curr"
+
+  prev="${PREV[$model]:-}"
   [[ -n "$prev" ]] || continue
 
   delta=$((curr - prev))
+  (( delta >= 0 )) || continue
+
   gb=$(awk "BEGIN {printf \"%.2f\", $delta * 512000 / 1000 / 1000 / 1000}")
 
-  name=$(ssd_friendly_name "$dev")
+  name=$(ssd_friendly_name "$model")
 
   report+="💽 ${name}
 Writes since last boot: ${gb} GB
@@ -137,14 +131,14 @@ if [[ ${#PREV[@]} -gt 0 ]]; then
 fi
 
 # ────────────────────────────────────────────────
-# Save current state for next boot
+# Save current state for next boot (MODEL keys)
 # ────────────────────────────────────────────────
 tmp=$(mktemp)
 echo "{}" > "$tmp"
 
-for dev in "${!CURRENT[@]}"; do
-  jq --arg dev "$dev" --argjson val "${CURRENT[$dev]}" \
-    '. + {($dev): $val}' "$tmp" > "${tmp}.new" && mv "${tmp}.new" "$tmp"
+for model in "${!CURRENT[@]}"; do
+  jq --arg key "$model" --argjson val "${CURRENT[$model]}" \
+    '. + {($key): $val}' "$tmp" > "${tmp}.new" && mv "${tmp}.new" "$tmp"
 done
 
 jq --arg ts "$(date -Is)" '. + {timestamp: $ts}' "$tmp" > "$STATE_FILE"
