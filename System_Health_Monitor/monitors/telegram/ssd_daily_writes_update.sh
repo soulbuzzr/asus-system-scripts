@@ -4,83 +4,55 @@
 # Uses SSD MODEL NAME as identity (safe against nvme reordering)
 
 set -u
+set -o pipefail
 
-# ================= RESOLVE HOME DIRECTORY for root user (for cron) =================
+# ================= RESOLVE HOME DIRECTORY for root user =================
 if [[ "$HOME" == "/root" ]]; then
   HOME="/home/sughosha"
 fi
 
-# ────────────────────────────────────────────────
-# Config files
-# ────────────────────────────────────────────────
-LIB_MODULE="$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
+# ================= PATHS =================
+BASE_DIR="$HOME/System_Scripts/System_Health_Monitor"
+LIB_MODULE="$BASE_DIR/lib/health_lib.sh"
 
 STATE_DIR="$HOME/System_Scripts"
 STATE_FILE="${STATE_DIR}/last_boot.json"
 
 NVME_DEVS=(/dev/nvme0n1 /dev/nvme1n1)
 
-# ────────────────────────────────────────────────
-# Load shared Library module
-# ────────────────────────────────────────────────
-[[ -f "$LIB_MODULE" ]] && source "$LIB_MODULE"
+# ================= LOAD SHARED LIB =================
+[[ -f "$LIB_MODULE" ]] || exit 0
+# shellcheck source=/dev/null
+source "$LIB_MODULE"
+
 HOST_DISPLAY="${HOST_NAME:-🖥 $(hostname)}"
 
 mkdir -p "$STATE_DIR"
 
+command -v nvme >/dev/null 2>&1 || exit 0
+command -v smartctl >/dev/null 2>&1 || exit 0
+command -v jq >/dev/null 2>&1 || exit 0
+
 # ================= WAIT FOR NETWORK =================
 until internet_up; do
-  log SSD DAILY WRITES "Waiting for internet..."
+  log SSD_WRITES "Waiting for internet..."
   sleep 5
 done
 
 sleep 75
-# ────────────────────────────────────────────────
-# Helpers
-# ────────────────────────────────────────────────
-ssd_model_name() {
-  smartctl -a "$1" 2>/dev/null | awk -F: '/Model Number/ {print $2}' | xargs
-}
-
-ssd_friendly_name() {
-  local model="$1"
-  case "$model" in
-    *PM9A1*) echo "Samsung PCIe Gen4 SSD" ;;
-    *CT*P3*) echo "Crucial PCIe Gen3 SSD" ;;
-    *)       echo "$model" ;;
-  esac
-}
-
-get_written_units() {
-  smartctl -a "$1" 2>/dev/null |
-    awk -F: '/Data Units Written/ {print $2}' |
-    awk '{print $1}' |
-    tr -d ','
-}
-
-is_number() {
-  [[ "$1" =~ ^[0-9]+$ ]]
-}
-
-send_telegram() {
-  curl -s -X POST "https://api.telegram.org/bot$TG_BOT_TOKEN/sendMessage" \
-    --data-urlencode "chat_id=$TG_CHAT_ID" \
-    --data-urlencode "text=$1" \
-    --data-urlencode "parse_mode=Markdown" \
-    --data-urlencode "disable_web_page_preview=true" >/dev/null
-}
+log SSD_WRITES "SSD daily writes monitor started"
 
 # ────────────────────────────────────────────────
 # Load previous boot state (MODEL → value)
 # ────────────────────────────────────────────────
-declare -A PREV
-declare -A CURRENT
+declare -A PREV=()
+declare -A CURRENT=()
 
 if [[ -f "$STATE_FILE" ]] && jq . "$STATE_FILE" >/dev/null 2>&1; then
   while IFS="=" read -r model val; do
-    if [[ -n "$model" ]] && is_number "$val"; then
-      PREV["$model"]="$val"
-    fi
+    [[ -n "$model" && "$model" != "timestamp" ]] || continue
+    [[ "$val" =~ ^[0-9]+$ ]] || continue
+    PREV["$model"]="$val"
   done < <(jq -r 'to_entries[] | "\(.key)=\(.value)"' "$STATE_FILE")
 fi
 
@@ -97,7 +69,7 @@ total_gb=0
 
 for dev in "${NVME_DEVS[@]}"; do
   curr=$(get_written_units "$dev")
-  is_number "$curr" || continue
+  [[ "$curr" =~ ^[0-9]+$ ]] || continue
 
   model=$(ssd_model_name "$dev")
   [[ -n "$model" ]] || continue
@@ -118,6 +90,7 @@ for dev in "${NVME_DEVS[@]}"; do
 Writes since last boot: ${gb} GB
 
 "
+
   total_gb=$(awk "BEGIN {printf \"%.2f\", $total_gb + $gb}")
 done
 
@@ -126,8 +99,11 @@ report+="*📦 Total SSD Writes: ${total_gb} GB*"
 # ────────────────────────────────────────────────
 # Send Telegram (only if previous data existed)
 # ────────────────────────────────────────────────
-if [[ ${#PREV[@]} -gt 0 ]]; then
-  send_telegram "$report"
+if (( ${#PREV[@]} > 0 )); then
+  log SSD_WRITES "Sending daily SSD write report (${total_gb} GB)"
+  tg_send "$report"
+else
+  log SSD_WRITES "No previous boot data; skipping report"
 fi
 
 # ────────────────────────────────────────────────
@@ -143,3 +119,5 @@ done
 
 jq --arg ts "$(date -Is)" '. + {timestamp: $ts}' "$tmp" > "$STATE_FILE"
 rm -f "$tmp"
+
+log SSD_WRITES "SSD write state updated"

@@ -105,3 +105,12 @@ ssd_temperature() {
   nvme smart-log "$1" 2>/dev/null \
     | awk -F'[(:]' '/^temperature/ {print $2+0}'
 }
+
+# ================= SSD DATA UNITS WRITTEN =================
+get_written_units() {
+  # Returns NVMe Data Units Written (raw units, numeric)
+  smartctl -a "$1" 2>/dev/null \
+    | awk -F: '/Data Units Written/ {print $2}' \
+    | awk '{print $1}' \
+    | tr -d ','
+}
