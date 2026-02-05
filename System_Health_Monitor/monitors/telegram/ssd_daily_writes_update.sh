@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SSD Write Report at BOOT (NVMe SMART based)
 # Reports writes since LAST BOOT in GB
-# Uses SSD MODEL NAME as identity (safe against nvme reordering)
+# Uses FRIENDLY SSD NAME as identity
 
 set -u
 set -o pipefail
@@ -43,16 +43,16 @@ sleep 75
 log SSD_WRITES "SSD daily writes monitor started"
 
 # ────────────────────────────────────────────────
-# Load previous boot state (MODEL → value)
+# Load previous boot state (FRIENDLY NAME → value)
 # ────────────────────────────────────────────────
 declare -A PREV=()
 declare -A CURRENT=()
 
 if [[ -f "$STATE_FILE" ]] && jq . "$STATE_FILE" >/dev/null 2>&1; then
-  while IFS="=" read -r model val; do
-    [[ -n "$model" && "$model" != "timestamp" ]] || continue
+  while IFS="=" read -r key val; do
+    [[ -n "$key" && "$key" != "timestamp" ]] || continue
     [[ "$val" =~ ^[0-9]+$ ]] || continue
-    PREV["$model"]="$val"
+    PREV["$key"]="$val"
   done < <(jq -r 'to_entries[] | "\(.key)=\(.value)"' "$STATE_FILE")
 fi
 
@@ -71,20 +71,20 @@ for dev in "${NVME_DEVS[@]}"; do
   curr=$(get_written_units "$dev")
   [[ "$curr" =~ ^[0-9]+$ ]] || continue
 
-  model=$(ssd_model_name "$dev")
-  [[ -n "$model" ]] || continue
+  name=$(ssd_friendly_name "$dev")
+  [[ -n "$name" ]] || continue
 
-  CURRENT["$model"]="$curr"
+  CURRENT["$name"]="$curr"
 
-  prev="${PREV[$model]:-}"
-  [[ -n "$prev" ]] || continue
+  prev="${PREV[$name]:-}"
 
-  delta=$((curr - prev))
-  (( delta >= 0 )) || continue
-
-  gb=$(awk "BEGIN {printf \"%.2f\", $delta * 512000 / 1000 / 1000 / 1000}")
-
-  name=$(ssd_friendly_name "$model")
+  if [[ -n "$prev" ]]; then
+    delta=$((curr - prev))
+    (( delta >= 0 )) || delta=0
+    gb=$(awk "BEGIN {printf \"%.2f\", $delta * 512000 / 1000 / 1000 / 1000}")
+  else
+    gb="0.00"
+  fi
 
   report+="💽 ${name}
 Writes since last boot: ${gb} GB
@@ -97,23 +97,19 @@ done
 report+="*📦 Total SSD Writes: ${total_gb} GB*"
 
 # ────────────────────────────────────────────────
-# Send Telegram (only if previous data existed)
+# Send Telegram
 # ────────────────────────────────────────────────
-if (( ${#PREV[@]} > 0 )); then
-  log SSD_WRITES "Sending daily SSD write report (${total_gb} GB)"
-  tg_send "$report"
-else
-  log SSD_WRITES "No previous boot data; skipping report"
-fi
+log SSD_WRITES "Sending daily SSD write report (${total_gb} GB)"
+tg_send "$report"
 
 # ────────────────────────────────────────────────
-# Save current state for next boot (MODEL keys)
+# Save current state for next boot (FRIENDLY NAME keys)
 # ────────────────────────────────────────────────
 tmp=$(mktemp)
 echo "{}" > "$tmp"
 
-for model in "${!CURRENT[@]}"; do
-  jq --arg key "$model" --argjson val "${CURRENT[$model]}" \
+for name in "${!CURRENT[@]}"; do
+  jq --arg key "$name" --argjson val "${CURRENT[$name]}" \
     '. + {($key): $val}' "$tmp" > "${tmp}.new" && mv "${tmp}.new" "$tmp"
 done
 
