@@ -1,0 +1,30 @@
+Service running at /etc/systemd/system/load-telegram-to-ram.service
+[Unit]
+Description=Load Telegram data into RAM and create symlink
+After=start-ramdisk.service
+Requires=start-ramdisk.service
+
+[Service]
+Type=oneshot
+User=sughosha
+Group=sughosha
+RemainAfterExit=yes
+
+# Ensure RAM Telegram directory exists
+ExecStart=/bin/mkdir -p /home/sughosha/Ramdisk/telegram-data
+ExecStart=/bin/chmod 0700 /home/sughosha/Ramdisk/telegram-data
+
+# Remove existing Telegram data directory
+ExecStart=/bin/bash -c 'rm -rf /home/sughosha/.local/share/TelegramDesktop'
+
+# Create / fix symlink
+ExecStart=/bin/ln -snf /home/sughosha/Ramdisk/telegram-data /home/sughosha/.local/share/TelegramDesktop
+
+# Restore Telegram data from SSD
+ExecStart=/usr/bin/rsync -a /home/sughosha/.local/share/TelegramDesktop.ssd/ /home/sughosha/Ramdisk/telegram-data/
+
+# Cleanup on stop
+ExecStop=/bin/bash -c 'rm -rf /home/sughosha/Ramdisk/telegram-data'
+
+[Install]
+WantedBy=multi-user.target
