@@ -1,11 +1,29 @@
 #!/bin/bash
 set -euo pipefail
 
-# ================= CONFIG =================
-# Telegram notification integration (from cron env)
-: "${TG_BOT_TOKEN:?TG_BOT_TOKEN not set}"
-: "${TG_CHAT_ID:?TG_CHAT_ID not set}"
-LOG_FILE="/var/log/system_health_hourly_stats.log"
+# ================= RESOLVE HOME DIRECTORY for root user =================
+if [[ "$HOME" == "/root" ]]; then
+  HOME="/home/sughosha"
+fi
+
+# ================= LOAD ENV =================
+ENV_FILE="$HOME/System_Scripts/System_Health_Monitor/env/system_health_bot.env"
+
+if [ ! -r "$ENV_FILE" ]; then
+  echo "ERROR: Missing env file: $ENV_FILE" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$ENV_FILE"
+
+: "${TG_HOURLY_BOT_TOKEN:?Missing TG_HOURLY_BOT_TOKEN}"
+: "${TG_CHAT_ID:?Missing TG_CHAT_ID}"
+
+# ================= LOG FILE =================
+LOG_DIR="/var/log/system_health"
+LOG_FILE="$LOG_DIR/health.log"
+
+mkdir -p "$LOG_DIR"
 
 # ================= BASICS =================
 HOST='💻  ASUS Linux Workstation'
@@ -139,7 +157,7 @@ $NVME_BLOCK$NVIDIA_BLOCK🧠 *Memory*
 echo "$(echo "$MSG" | sed 's/\*//g')" >> "$LOG_FILE"
 
 # ================= TELEGRAM =================
-curl -s -X POST "https://api.telegram.org/bot$TG_BOT_TOKEN/sendMessage" \
+curl -s -X POST "https://api.telegram.org/bot$TG_HOURLY_BOT_TOKEN/sendMessage" \
   -d chat_id="$TG_CHAT_ID" \
   -d text="$MSG" \
   -d parse_mode=Markdown \
