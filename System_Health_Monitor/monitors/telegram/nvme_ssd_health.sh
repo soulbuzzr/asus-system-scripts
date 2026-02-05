@@ -21,8 +21,6 @@ until internet_up; do
   sleep 5
 done
 
-sleep 60
-
 # ================= THRESHOLDS =================
 get_health_thresholds() {
   case "$1" in

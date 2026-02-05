@@ -1,0 +1,37 @@
+Service running at /etc/systemd/system/load-vscode-to-ram.service
+[Unit]
+Description=Load Cursor profile and extensions into RAM and create symlinks
+After=start-ramdisk.service
+Requires=start-ramdisk.service
+
+[Service]
+Type=oneshot
+User=sughosha
+Group=sughosha
+RemainAfterExit=yes
+
+# Create RAM directories
+ExecStart=/bin/mkdir -p /home/sughosha/Ramdisk/cursor/Cursor
+ExecStart=/bin/mkdir -p /home/sughosha/Ramdisk/cursor/extensions
+
+# Enforce top-level permissions only
+ExecStart=/bin/chmod 0775 /home/sughosha/Ramdisk/cursor
+ExecStart=/bin/chmod 0700 /home/sughosha/Ramdisk/cursor/Cursor
+ExecStart=/bin/chmod 0775 /home/sughosha/Ramdisk/cursor/extensions
+
+# Remove existing Cursor paths (will be recreated as symlinks)
+ExecStart=/bin/bash -c 'rm -rf /home/sughosha/.config/Cursor /home/sughosha/.cursor'
+
+# Create symlinks
+ExecStart=/bin/ln -snf /home/sughosha/Ramdisk/cursor/Cursor /home/sughosha/.config/Cursor
+ExecStart=/bin/ln -snf /home/sughosha/Ramdisk/cursor/extensions /home/sughosha/.cursor
+
+# Restore contents from SSD backups with original permissions
+ExecStart=/usr/bin/rsync -a /home/sughosha/.config/Cursor.ssd/ /home/sughosha/Ramdisk/cursor/Cursor/
+ExecStart=/usr/bin/rsync -a /home/sughosha/.cursor.ssd/ /home/sughosha/Ramdisk/cursor/extensions/
+
+# Cleanup on stop
+ExecStop=/bin/bash -c 'rm -rf /home/sughosha/Ramdisk/cursor'
+
+[Install]
+WantedBy=multi-user.target

@@ -15,8 +15,6 @@ until internet_up; do
   sleep 5
 done
 
-sleep 60
-
 # ================= STARTUP NOTIFY =================
 STARTUP_MSG="✅ *CPU Load Monitor Active*
 $HOST_NAME

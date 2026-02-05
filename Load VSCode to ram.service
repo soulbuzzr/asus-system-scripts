@@ -1,0 +1,37 @@
+Service running at /etc/systemd/system/load-vscode-to-ram.service
+[Unit]
+Description=Load VS Code profile and extensions into RAM and create symlinks
+After=start-ramdisk.service
+Requires=start-ramdisk.service
+
+[Service]
+Type=oneshot
+User=sughosha
+Group=sughosha
+RemainAfterExit=yes
+
+# Create RAM directories
+ExecStart=/bin/mkdir -p /home/sughosha/Ramdisk/vscode/Code
+ExecStart=/bin/mkdir -p /home/sughosha/Ramdisk/vscode/extensions
+
+# Enforce top-level permissions only
+ExecStart=/bin/chmod 0775 /home/sughosha/Ramdisk/vscode
+ExecStart=/bin/chmod 0700 /home/sughosha/Ramdisk/vscode/Code
+ExecStart=/bin/chmod 0775 /home/sughosha/Ramdisk/vscode/extensions
+
+# Remove existing VS Code paths (will be recreated as symlinks)
+ExecStart=/bin/bash -c 'rm -rf /home/sughosha/.config/Code /home/sughosha/.vscode'
+
+# Create symlinks
+ExecStart=/bin/ln -snf /home/sughosha/Ramdisk/vscode/Code /home/sughosha/.config/Code
+ExecStart=/bin/ln -snf /home/sughosha/Ramdisk/vscode/extensions /home/sughosha/.vscode
+
+# Restore contents from SSD backups with original permissions
+ExecStart=/usr/bin/rsync -a /home/sughosha/.config/Code.ssd/ /home/sughosha/Ramdisk/vscode/Code/
+ExecStart=/usr/bin/rsync -a /home/sughosha/.vscode.ssd/ /home/sughosha/Ramdisk/vscode/extensions/
+
+# Cleanup on stop
+ExecStop=/bin/bash -c 'rm -rf /home/sughosha/Ramdisk/vscode'
+
+[Install]
+WantedBy=multi-user.target

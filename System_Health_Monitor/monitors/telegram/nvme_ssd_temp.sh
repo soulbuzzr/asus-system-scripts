@@ -18,8 +18,6 @@ until internet_up; do
   sleep 5
 done
 
-sleep 60
-
 # ================= STARTUP NOTIFY =================
 log SSD_TEMP "SSD temperature monitor started"
 tg_send "💾 *SSD Temperature Monitor Active*

@@ -81,8 +81,6 @@ until internet_up; do
   sleep 5
 done
 
-sleep 60
-
 # ================= STARTUP =================
 log DUST "Dust / cooling monitor started"
 tg_send "🧹 *Dust / Cooling Monitor Started*

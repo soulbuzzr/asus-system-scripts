@@ -18,8 +18,6 @@ until internet_up; do
   sleep 5
 done
 
-sleep 60
-
 # ================= STARTUP NOTIFY =================
 STARTUP_MSG="✅ *GPU Temperature Monitor Active*
 $HOST_NAME

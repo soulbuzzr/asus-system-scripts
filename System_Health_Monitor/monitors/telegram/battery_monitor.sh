@@ -44,8 +44,6 @@ until internet_up; do
   sleep 5
 done
 
-sleep 60
-
 # ================= STARTUP =================
 log BATTERY "Battery monitor started"
 tg_send "🔋 *Battery Monitor Started*
