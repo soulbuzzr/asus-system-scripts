@@ -39,6 +39,8 @@ until internet_up; do
   sleep 5
 done
 
+sleep 10
+
 log SSD_WRITES "SSD daily writes monitor started"
 
 # ────────────────────────────────────────────────
