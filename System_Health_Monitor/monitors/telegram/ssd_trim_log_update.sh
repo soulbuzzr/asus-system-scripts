@@ -6,46 +6,42 @@ if [[ "$HOME" == "/root" ]]; then
   HOME="/home/sughosha"
 fi
 
-# ================= LOAD ENV =================
-ENV_FILE="$HOME/System_Scripts/System_Health_Monitor/env/system_health_bot.env"
+# ================= LOAD SHARED LIB =================
+source "$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
 
-if [ ! -r "$ENV_FILE" ]; then
-  echo "ERROR: Missing env file: $ENV_FILE" >&2
-  exit 1
-fi
-# shellcheck source=/dev/null
-source "$ENV_FILE"
-
+# ================= VALIDATION =================
 : "${TG_SSD_TRIM_BOT_TOKEN:?Missing TG_SSD_TRIM_BOT_TOKEN}"
 : "${TG_CHAT_ID:?Missing TG_CHAT_ID}"
-
-# ================= LOG FILE =================
-LOG_DIR="/var/log/system_health"
-LOG_FILE="$LOG_DIR/health.log"
-mkdir -p "$LOG_DIR"
-
-# ================= BASICS =================
-HOST='💻  ASUS Linux Workstation'
-TS=$(date '+%Y-%m-%d %H:%M:%S')
-
-STATE_DIR="$HOME/System_Scripts"
-JSON_FILE="$STATE_DIR/trim_status.json"
-mkdir -p "$STATE_DIR"
 
 command -v jq >/dev/null 2>&1 || exit 1
 command -v fstrim >/dev/null 2>&1 || exit 1
 
+# ================= PATHS =================
+STATE_DIR="$HOME/System_Scripts"
+STATE_FILE="$STATE_DIR/trim_status.json"
+mkdir -p "$STATE_DIR"
+
+HOST_DISPLAY="${HOST_NAME:-💻 $(hostname)}"
+TS="$(date '+%Y-%m-%d %H:%M:%S')"
+
+# ================= WAIT FOR NETWORK =================
+wait_for_network SSD_TRIM
+
 # ================= RUN FSTRIM =================
+log SSD_TRIM "starting fstrim"
+
 TRIM_OUTPUT="$(sudo fstrim -av 2>&1)"
 RC=$?
 
-if [[ $RC -eq 0 ]]; then
+if (( RC == 0 )); then
   STATUS="success"
   ICON="✅"
 else
   STATUS="failed"
   ICON="❌"
 fi
+
+log SSD_TRIM "fstrim completed status=${STATUS}"
 
 # ================= WRITE JSON STATE =================
 jq -n \
@@ -56,10 +52,10 @@ jq -n \
     last_trim_time: $time,
     status: $status,
     output: $output
-  }' > "$JSON_FILE"
+  }' > "$STATE_FILE"
 
 # ================= TELEGRAM MESSAGE =================
-MSG="*$HOST*
+MSG="*$HOST_DISPLAY*
 
 🧹 *SSD TRIM Report*
 
@@ -71,16 +67,8 @@ ${TRIM_OUTPUT}
 
 🕒 *${TS}*"
 
-# ================= LOG =================
-echo "$(echo "$MSG" | sed 's/\*//g')" >> "$LOG_FILE"
+tg_send_trim "$MSG"
 
-# ================= TELEGRAM =================
-curl -s -X POST "https://api.telegram.org/bot$TG_SSD_TRIM_BOT_TOKEN/sendMessage" \
-  -d chat_id="$TG_CHAT_ID" \
-  -d text="$MSG" \
-  -d parse_mode=Markdown \
-  -d disable_web_page_preview=true >/dev/null
-
-# ================= PRESERVE FSTRIM BEHAVIOR =================
+# ================= PRESERVE ORIGINAL BEHAVIOR =================
 echo "$TRIM_OUTPUT"
-exit $RC
+exit "$RC"

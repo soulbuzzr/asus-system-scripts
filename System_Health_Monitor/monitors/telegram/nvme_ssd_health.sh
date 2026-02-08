@@ -16,10 +16,7 @@ command -v nvme >/dev/null 2>&1 || exit 0
 command -v smartctl >/dev/null 2>&1 || exit 0
 
 # ================= WAIT FOR NETWORK =================
-until internet_up; do
-  log SSD "Waiting for internet..."
-  sleep 5
-done
+wait_for_network SSD
 
 # ================= THRESHOLDS =================
 get_health_thresholds() {
@@ -36,11 +33,17 @@ get_health_thresholds() {
   esac
 }
 
-# ================= STARTUP NOTIFY =================
-log SSD "NVMe SSD health monitor started"
-tg_send "✅ *NVMe SSD Health Monitor Active*
+# ================= STARTUP =================
+startup_notify SSD "✅ *NVMe SSD Health Monitor Active*
 $HOST_NAME
+
+Monitoring:
+• NVMe health percentage
+• Spare block usage
 Interval: *5 minutes*"
+
+# ================= INTERVAL =================
+CHECK_INTERVAL_SEC=300   # 5 minutes
 
 # ================= MAIN LOOP =================
 while true; do
@@ -48,30 +51,35 @@ while true; do
     NAME=$(ssd_friendly_name "$DEV")
     read WARN CRIT <<< "$(get_health_thresholds "$NAME")"
 
-    HEALTH=$(ssd_health_percent "$DEV")
-    SPARE_USED=$(ssd_spare_used "$DEV")
+    HEALTH=$(ssd_health_percent "$DEV" || true)
+    SPARE_USED=$(ssd_spare_used "$DEV" || true)
+
+    [[ -n "$HEALTH" ]] || continue
 
     log SSD "[$NAME] health=${HEALTH}% spare_used=${SPARE_USED}%"
 
     if (( HEALTH < WARN && HEALTH >= CRIT )); then
       tg_send "🟡 *SSD HEALTH DEGRADED*
 $HOST_NAME
+
 Drive: *$NAME*
 Health Remaining: *${HEALTH}%*
-Threshold: *${WARN}%*"
+Warning Threshold: *${WARN}%*"
     fi
 
     if (( HEALTH < CRIT )); then
       tg_send "🔴 *CRITICAL SSD HEALTH*
 $HOST_NAME
+
 Drive: *$NAME*
 Health Remaining: *${HEALTH}%*
-Threshold: *${CRIT}%*"
+Critical Threshold: *${CRIT}%*"
     fi
 
-    if (( SPARE_USED > 0 )); then
-      tg_send "🚨 *SSD FAILED BLOCKS*
+    if [[ -n "$SPARE_USED" ]] && (( SPARE_USED > 0 )); then
+      tg_send "🚨 *SSD FAILED BLOCKS DETECTED*
 $HOST_NAME
+
 Drive: *$NAME*
 Spare Used: *${SPARE_USED}%*"
     fi

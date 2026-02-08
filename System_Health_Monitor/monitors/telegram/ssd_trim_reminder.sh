@@ -1,42 +1,42 @@
 #!/bin/bash
 set -euo pipefail
 
-# ================= LOAD ENV =================
-ENV_FILE="$HOME/System_Scripts/System_Health_Monitor/env/system_health_bot.env"
-
-if [ ! -r "$ENV_FILE" ]; then
-  echo "ERROR: Missing env file: $ENV_FILE" >&2
-  exit 1
+# ================= RESOLVE HOME DIRECTORY for root user =================
+if [[ "$HOME" == "/root" ]]; then
+  HOME="/home/sughosha"
 fi
-# shellcheck source=/dev/null
-source "$ENV_FILE"
 
+# ================= LOAD SHARED LIB =================
+source "$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
+
+# ================= VALIDATION =================
 : "${TG_SSD_TRIM_BOT_TOKEN:?Missing TG_SSD_TRIM_BOT_TOKEN}"
 : "${TG_CHAT_ID:?Missing TG_CHAT_ID}"
 
-STATE="$HOME/System_Scripts/trim_status.json"
+command -v jq >/dev/null 2>&1 || exit 0
 
-command -v jq >/dev/null || exit 0
-[ -f "$STATE" ] || exit 0
+STATE_FILE="$HOME/System_Scripts/trim_status.json"
+[ -f "$STATE_FILE" ] || exit 0
 
-LAST=$(jq -r '.last_trim_time // empty' "$STATE")
-[ -n "$LAST" ] || exit 0
+# ================= READ LAST TRIM =================
+LAST_TRIM=$(jq -r '.last_trim_time // empty' "$STATE_FILE")
+[ -n "$LAST_TRIM" ] || exit 0
 
 NOW=$(date +%s)
-THEN=$(date -d "$LAST" +%s 2>/dev/null || exit 0)
+THEN=$(date -d "$LAST_TRIM" +%s 2>/dev/null || exit 0)
 
-(( (NOW - THEN) < 604800 )) && exit 0   # < 7 days
+# ================= THRESHOLD =================
+# 7 days = 604800 seconds
+(( (NOW - THEN) < 604800 )) && exit 0
 
+# ================= SEND REMINDER =================
 MSG="🧹 *SSD TRIM REMINDER*
 
 Last trim:
-🕒 *$LAST*
+🕒 *${LAST_TRIM}*
 
 ⏰ It’s time to run:
 \`sudo fstrim -av\`"
 
-curl -s -X POST "https://api.telegram.org/bot$TG_SSD_TRIM_BOT_TOKEN/sendMessage" \
-  -d chat_id="$TG_CHAT_ID" \
-  -d text="$MSG" \
-  -d parse_mode=Markdown \
-  -d disable_web_page_preview=true >/dev/null
+log SSD_TRIM "sending trim reminder (last=${LAST_TRIM})"
+tg_send_trim "$MSG"

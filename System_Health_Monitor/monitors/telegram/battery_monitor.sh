@@ -8,125 +8,89 @@ source "$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
 # ================= VALIDATION =================
 : "${BATTERY_HEALTH_WARN:?Missing BATTERY_HEALTH_WARN}"
 : "${BATTERY_HEALTH_CRIT:?Missing BATTERY_HEALTH_CRIT}"
-: "${BATTERY_HEALTH_INTERVAL:?Missing BATTERY_HEALTH_INTERVAL}"
+: "${BATTERY_HEALTH_INTERVAL:?Missing BATTERY_HEALTH_INTERVAL}"   
 : "${BATTERY_CHARGE_WARN:?Missing BATTERY_CHARGE_WARN}"
 : "${BATTERY_CHARGE_CRIT:?Missing BATTERY_CHARGE_CRIT}"
-: "${BATTERY_CHECK_INTERVAL:?Missing BATTERY_CHECK_INTERVAL}"
+: "${BATTERY_CHECK_INTERVAL:?Missing BATTERY_CHECK_INTERVAL}"     
 : "${HOST_NAME:?Missing HOST_NAME}"
 
-# ================= BATTERY HELPERS =================
-battery_path() {
-  ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -n1
-}
-
-battery_present() {
-  [ -n "$(battery_path)" ]
-}
-
-battery_health_percent() {
-  local full design
-
-  full=$(cat "$(battery_path)/charge_full" 2>/dev/null) || return
-  design=$(cat "$(battery_path)/charge_full_design" 2>/dev/null) || return
-
-  [ -n "$full" ] && [ -n "$design" ] && [ "$design" -gt 0 ] || return
-
-  echo $(( full * 100 / design ))
-}
-
-battery_charge_percent() {
-  cat "$(battery_path)/capacity" 2>/dev/null
-}
-
 # ================= WAIT FOR NETWORK =================
-until internet_up; do
-  log BATTERY "Waiting for internet before startup..."
-  sleep 5
-done
+wait_for_network BATTERY
 
 # ================= STARTUP =================
-log BATTERY "Battery monitor started"
-tg_send "🔋 *Battery Monitor Started*
+startup_notify BATTERY "🔋 *Battery Monitor Started*
 $HOST_NAME
 
 Monitoring:
 • Battery health (wear)
 • Battery charge level
-Polling interval: *1 minute*"
 
-# ================= TIMERS (SECONDS) =================
-BATTERY_HEALTH_TIMER=0
-BATTERY_CHARGE_TIMER=0
+Intervals:
+• Health check: *${BATTERY_HEALTH_INTERVAL} min*
+• Charge check: *${BATTERY_CHECK_INTERVAL} min*"
+
+# ================= INTERVALS (SECONDS) =================
+HEALTH_INTERVAL_SEC=$(( BATTERY_HEALTH_INTERVAL * 60 ))
+CHARGE_INTERVAL_SEC=$(( BATTERY_CHECK_INTERVAL * 60 ))
+
+# ================= TIMESTAMPS =================
+now=$(date +%s)
+LAST_HEALTH_CHECK=$now
+LAST_CHARGE_CHECK=$now
 
 # ================= MAIN LOOP =================
 while true; do
-  if ! battery_present; then
-    log BATTERY "No battery detected – exiting monitor"
+  now=$(date +%s)
 
+  # -------- Battery presence --------
+  if ! battery_present; then
+    log BATTERY "No battery detected – exiting"
     tg_send "⚠️ *BATTERY NOT DETECTED*
 $HOST_NAME
 
-No battery device found.
-This system appears to be a desktop or battery is unavailable.
-
-*Battery monitor exiting.*"
-
+Battery monitor exiting."
     exit 0
   fi
 
   # -------- Battery health --------
-  if (( BATTERY_HEALTH_TIMER >= BATTERY_HEALTH_INTERVAL )); then
-    HEALTH=$(battery_health_percent || echo "")
-    if [ -n "$HEALTH" ]; then
-      log BATTERY "HEALTH=${HEALTH}%"
+  if (( now - LAST_HEALTH_CHECK >= HEALTH_INTERVAL_SEC )); then
+    HEALTH=$(battery_health_percent || true)
+    if [[ -n "$HEALTH" ]]; then
+      log BATTERY "health=${HEALTH}%"
 
       if (( HEALTH <= BATTERY_HEALTH_CRIT )); then
         tg_send "🔴 *BATTERY HEALTH CRITICAL*
 $HOST_NAME
-Battery Health: *${HEALTH}%*
-Threshold: *${BATTERY_HEALTH_CRIT}%*"
-
-        log BATTERY "ALERT: health critical (${HEALTH}%)"
+Health: *${HEALTH}%*"
 
       elif (( HEALTH <= BATTERY_HEALTH_WARN )); then
         tg_send "🟡 *BATTERY HEALTH DEGRADED*
 $HOST_NAME
-Battery Health: *${HEALTH}%*
-Threshold: *${BATTERY_HEALTH_WARN}%*"
-
-        log BATTERY "ALERT: health degraded (${HEALTH}%)"
+Health: *${HEALTH}%*"
       fi
     fi
-    BATTERY_HEALTH_TIMER=0
+    LAST_HEALTH_CHECK=$now
   fi
 
   # -------- Battery charge --------
-  if (( BATTERY_CHARGE_TIMER >= BATTERY_CHECK_INTERVAL )); then
-    CHARGE=$(battery_charge_percent || echo "")
-    if [ -n "$CHARGE" ]; then
-      log BATTERY "CHARGE=${CHARGE}%"
+  if (( now - LAST_CHARGE_CHECK >= CHARGE_INTERVAL_SEC )); then
+    CHARGE=$(battery_charge_percent || true)
+    if [[ -n "$CHARGE" ]]; then
+      log BATTERY "charge=${CHARGE}%"
 
       if (( CHARGE <= BATTERY_CHARGE_CRIT )); then
         tg_send "🔴 *BATTERY CHARGE CRITICAL*
 $HOST_NAME
-Charge Level: *${CHARGE}%*
-Threshold: *${BATTERY_CHARGE_CRIT}%*"
-
-        log BATTERY "ALERT: charge critical (${CHARGE}%)"
+Charge: *${CHARGE}%*"
 
       elif (( CHARGE <= BATTERY_CHARGE_WARN )); then
         tg_send "🟡 *BATTERY CHARGE LOW*
 $HOST_NAME
-Charge Level: *${CHARGE}%*
-Threshold: *${BATTERY_CHARGE_WARN}%*"
-
-        log BATTERY "ALERT: charge low (${CHARGE}%)"
+Charge: *${CHARGE}%*"
       fi
     fi
-    BATTERY_CHARGE_TIMER=0
+    LAST_CHARGE_CHECK=$now
   fi
 
   sleep 60
-  BATTERY_HEALTH_TIMER=$((BATTERY_HEALTH_TIMER + 60))
-  BATTERY_CHARGE_TIMER=$((BATTERY_CHARGE_TIMER + 60))
 done

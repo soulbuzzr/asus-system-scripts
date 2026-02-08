@@ -5,8 +5,8 @@ export DISPLAY=:0
 export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
 
 # Thresholds
-CPU_LIMIT=80
-GPU_LIMIT=75
+CPU_LIMIT=75
+GPU_LIMIT=80
 
 for i in {1..6}; do
     # Get CPU temperature (Tctl from k10temp)

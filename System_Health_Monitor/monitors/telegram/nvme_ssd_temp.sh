@@ -6,37 +6,40 @@ set -o pipefail
 source "$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
 
 # ================= VALIDATION =================
-: "${SSD_TEMP_WARN:?Missing SSD_TEMP_WARN}"
+: "${SSD_TEMP_WARN:?Missing SSD_TEMP_WARN}"   # °C
 : "${HOST_NAME:?Missing HOST_NAME}"
 
 command -v nvme >/dev/null 2>&1 || exit 0
 command -v smartctl >/dev/null 2>&1 || exit 0
 
 # ================= WAIT FOR NETWORK =================
-until internet_up; do
-  log SSD_TEMP "Waiting for internet..."
-  sleep 5
-done
+wait_for_network SSD_TEMP
 
-# ================= STARTUP NOTIFY =================
-log SSD_TEMP "SSD temperature monitor started"
-tg_send "💾 *SSD Temperature Monitor Active*
+# ================= STARTUP =================
+startup_notify SSD_TEMP "💾 *SSD Temperature Monitor Active*
 $HOST_NAME
-Threshold: *${SSD_TEMP_WARN}°C*"
+
+Threshold:
+• SSD temperature > *${SSD_TEMP_WARN}°C*
+Interval: *1 minute*"
+
+# ================= INTERVAL =================
+CHECK_INTERVAL_SEC=60
 
 # ================= MAIN LOOP =================
 while true; do
   for DEV in $(get_nvme_devices); do
     NAME=$(ssd_friendly_name "$DEV")
-    TEMP=$(ssd_temperature "$DEV")
+    TEMP=$(ssd_temperature "$DEV" || true)
 
-    [ -n "$TEMP" ] || continue
+    [[ -n "$TEMP" ]] || continue
 
     log SSD_TEMP "[$NAME] temp=${TEMP}C"
 
     if (( TEMP > SSD_TEMP_WARN )); then
-      tg_send "⚠️ *SSD TEMP HIGH*
+      tg_send "⚠️ *SSD TEMPERATURE HIGH*
 $HOST_NAME
+
 Drive: *$NAME*
 Temperature: *${TEMP}°C*
 Threshold: *${SSD_TEMP_WARN}°C*"
