@@ -23,9 +23,11 @@ Threshold: *${CPU_TEMP_THRESHOLD}°C*"
 # ================= TEMP READER =================
 read_cpu_temp() {
   # Reads temperature in °C (integer)
-  for z in /sys/class/thermal/thermal_zone0/temp; do
-    [ -r "$z" ] || continue
-    awk '{printf "%d",$1/1000; exit}' "$z"
+  local zone
+  for zone in /sys/class/thermal/thermal_zone*; do
+    [ -r "$zone/type" ] || continue
+    [ "$(cat "$zone/type")" = "acpitz" ] || continue
+    awk '{printf "%d",$1/1000; exit}' "$zone/temp"
   done
 }
 
