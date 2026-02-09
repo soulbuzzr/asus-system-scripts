@@ -86,6 +86,27 @@ startup_notify() {
   "$sender" "$message"
 }
 
+# ================= CPU TEMPERATURE =================
+read_cpu_temp() {
+  # Reads CPU temperature in °C (integer) from acpitz
+  local zone
+  for zone in /sys/class/thermal/thermal_zone*; do
+    [ -r "$zone/type" ] || continue
+    [ -r "$zone/temp" ] || continue
+    [ "$(cat "$zone/type" 2>/dev/null)" = "acpitz" ] || continue
+    awk '{printf "%d\n", $1/1000; exit}' "$zone/temp" 2>/dev/null
+    return 0
+  done
+  return 1
+}
+
+
+# ================= GPU TEMPERATURE =================
+read_gpu_temp() {
+  nvidia-smi --query-gpu=temperature.gpu \
+             --format=csv,noheader,nounits 2>/dev/null
+}
+
 # ================= NVME DISCOVERY =================
 get_nvme_devices() {
   smartctl --scan 2>/dev/null | awk '{print $1}' 
@@ -183,12 +204,6 @@ save_json_state() {
 
   jq --arg ts "$(date -Is)" '. + {timestamp: $ts}' "$tmp" > "$file"
   rm -f "$tmp"
-}
-
-# ================= GPU TEMP =================
-read_gpu_temp() {
-  nvidia-smi --query-gpu=temperature.gpu \
-             --format=csv,noheader,nounits 2>/dev/null
 }
 
 # ================= BATTERY UTILITIES =================

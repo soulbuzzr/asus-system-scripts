@@ -6,39 +6,42 @@ set -o pipefail
 source "$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
 
 # ================= VALIDATION =================
-: "${DUST_CPU_ACTIVE_MAX:?Missing DUST_CPU_ACTIVE_MAX}"    
-: "${DUST_CPU_TEMP_MIN:?Missing DUST_CPU_TEMP_MIN}"         
-: "${DUST_CPU_TEMP_MAD_MAX:?Missing DUST_CPU_TEMP_MAD_MAX}" 
-: "${DUST_DETECT_DURATION:?Missing DUST_DETECT_DURATION}"   
+: "${DUST_CPU_ACTIVE_MAX:?Missing DUST_CPU_ACTIVE_MAX}"
+: "${DUST_CPU_TEMP_MIN:?Missing DUST_CPU_TEMP_MIN}"
+: "${DUST_CPU_TEMP_MAD_MAX:?Missing DUST_CPU_TEMP_MAD_MAX}"
+: "${DUST_DETECT_DURATION:?Missing DUST_DETECT_DURATION}"
 : "${HOST_NAME:?Missing HOST_NAME}"
 
-# ================= CPU SAMPLING (1 MIN) =================
+# ================= CPU SAMPLING (≈1 MIN) =================
 cpu_sample_60s() {
   local temp_sum=0
   local temp_count=0
+  local cpu_active cpu_temp
 
   mpstat 1 60 > /tmp/mpstat.$$ &
   MPSTAT_PID=$!
 
   for _ in {1..60}; do
-    for z in /sys/class/thermal/thermal_zone0/temp; do
-      [ -r "$z" ] || continue
-      val=$(awk '{print $1/1000}' "$z")
-      temp_sum=$(awk "BEGIN{print $temp_sum + $val}")
+    if cpu_temp=$(read_cpu_temp); then
+      temp_sum=$((temp_sum + cpu_temp))
       temp_count=$((temp_count + 1))
-      break
-    done
+    fi
     sleep 1
   done
 
   wait "$MPSTAT_PID" || true
 
-  CPU_ACTIVE=$(awk '/Average/ {printf "%.1f",100-$NF}' /tmp/mpstat.$$)
-  CPU_TEMP=$(awk "BEGIN{printf \"%.1f\", $temp_sum / $temp_count}")
+  cpu_active=$(awk '/Average/ {printf "%.1f", 100 - $NF}' /tmp/mpstat.$$)
+
+  if (( temp_count > 0 )); then
+    cpu_temp=$(awk "BEGIN{printf \"%.1f\", $temp_sum / $temp_count}")
+  else
+    cpu_temp=0
+  fi
 
   rm -f /tmp/mpstat.$$
 
-  echo "$CPU_ACTIVE $CPU_TEMP"
+  echo "$cpu_active $cpu_temp"
 }
 
 # ================= WAIT FOR NETWORK =================
@@ -74,7 +77,6 @@ while true; do
 
   # ---- wait until window full ----
   if (( ${#CPU_ACTIVE_BUF[@]} < DUST_DETECT_DURATION )); then
-    sleep 1
     continue
   fi
 
@@ -109,5 +111,4 @@ Duration: *${DUST_DETECT_DURATION} minutes*
     log DUST "ALERT SENT (dust/cooling suspected)"
     DUST_STREAK=0
   fi
-
 done

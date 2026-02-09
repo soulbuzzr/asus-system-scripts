@@ -20,17 +20,6 @@ Monitoring:
 • 30-second averaged CPU temperature
 Threshold: *${CPU_TEMP_THRESHOLD}°C*"
 
-# ================= TEMP READER =================
-read_cpu_temp() {
-  # Reads temperature in °C (integer)
-  local zone
-  for zone in /sys/class/thermal/thermal_zone*; do
-    [ -r "$zone/type" ] || continue
-    [ "$(cat "$zone/type")" = "acpitz" ] || continue
-    awk '{printf "%d",$1/1000; exit}' "$zone/temp"
-  done
-}
-
 # ================= MAIN LOOP =================
 while true; do
   AVG_TEMP=$(avg_over_seconds 30 read_cpu_temp) || {
