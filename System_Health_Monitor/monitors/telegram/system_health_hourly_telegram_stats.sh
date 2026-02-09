@@ -14,8 +14,6 @@ source "$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
 : "${TG_CHAT_ID:?Missing TG_CHAT_ID}"
 : "${HOST_NAME:?Missing HOST_NAME}"
 
-command -v mpstat >/dev/null 2>&1 || exit 0
-
 # ================= WAIT FOR NETWORK =================
 wait_for_network HOURLY
 
@@ -86,19 +84,11 @@ for DEV in $(get_nvme_devices); do
 "
 done
 # ================= GPU BLOCK =================
-GPU_BLOCK=""
-
-if command -v nvidia-smi >/dev/null 2>&1; then
-  GPU_TEMP="$(read_gpu_temp || true)"
-  if [[ "$GPU_TEMP" =~ ^[0-9]+$ ]]; then
-    GPU_E=$(temp_emoji "$GPU_TEMP")
-    GPU_BLOCK="🎮 *GPU*
-• NVIDIA Temp: *${GPU_TEMP}°C* ${GPU_E}
+GPU_BLOCK="🎮 *GPU*
+• NVIDIA Temp: *$(read_gpu_temp)°C* $(temp_emoji "$(read_gpu_temp)")
 
 "
-  fi
-fi
-
+  
 # ================= MEMORY BLOCK =================
 read RAM_USED RAM_PCT RAM_AVAIL RAM_TOTAL <<< \
 $(free -h | awk '/Mem:/ {printf "%s %.0f %s %s",$3,$3/$2*100,$7,$2}')

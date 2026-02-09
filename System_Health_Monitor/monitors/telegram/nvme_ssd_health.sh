@@ -12,9 +12,6 @@ source "$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
 : "${SSD_CRUCIAL_HEALTH_CRIT:?Missing SSD_CRUCIAL_HEALTH_CRIT}"
 : "${HOST_NAME:?Missing HOST_NAME}"
 
-command -v nvme >/dev/null 2>&1 || exit 0
-command -v smartctl >/dev/null 2>&1 || exit 0
-
 # ================= WAIT FOR NETWORK =================
 wait_for_network SSD
 

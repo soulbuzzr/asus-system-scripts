@@ -9,9 +9,6 @@ source "$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
 : "${GPU_TEMP_THRESHOLD:?Missing GPU_TEMP_THRESHOLD}"   # °C
 : "${HOST_NAME:?Missing HOST_NAME}"
 
-# ================= GPU DETECTION =================
-command -v nvidia-smi >/dev/null 2>&1 || exit 0
-
 # ================= WAIT FOR NETWORK =================
 wait_for_network GPU_TEMP
 
@@ -22,12 +19,6 @@ $HOST_NAME
 Monitoring:
 • 30-second averaged GPU temperature
 Threshold: *${GPU_TEMP_THRESHOLD}°C*"
-
-# ================= TEMP READER =================
-read_gpu_temp() {
-  nvidia-smi --query-gpu=temperature.gpu \
-             --format=csv,noheader,nounits 2>/dev/null
-}
 
 # ================= MAIN LOOP =================
 while true; do

@@ -100,7 +100,6 @@ read_cpu_temp() {
   return 1
 }
 
-
 # ================= GPU TEMPERATURE =================
 read_gpu_temp() {
   nvidia-smi --query-gpu=temperature.gpu \

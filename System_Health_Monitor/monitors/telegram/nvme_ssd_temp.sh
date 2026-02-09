@@ -9,9 +9,6 @@ source "$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
 : "${SSD_TEMP_WARN:?Missing SSD_TEMP_WARN}"   # °C
 : "${HOST_NAME:?Missing HOST_NAME}"
 
-command -v nvme >/dev/null 2>&1 || exit 0
-command -v smartctl >/dev/null 2>&1 || exit 0
-
 # ================= WAIT FOR NETWORK =================
 wait_for_network SSD_TEMP
 

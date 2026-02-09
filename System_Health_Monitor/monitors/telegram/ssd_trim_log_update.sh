@@ -13,9 +13,6 @@ source "$HOME/System_Scripts/System_Health_Monitor/lib/health_lib.sh"
 : "${TG_SSD_TRIM_BOT_TOKEN:?Missing TG_SSD_TRIM_BOT_TOKEN}"
 : "${TG_CHAT_ID:?Missing TG_CHAT_ID}"
 
-command -v jq >/dev/null 2>&1 || exit 1
-command -v fstrim >/dev/null 2>&1 || exit 1
-
 # ================= PATHS =================
 STATE_DIR="$HOME/System_Scripts"
 STATE_FILE="$STATE_DIR/trim_status.json"

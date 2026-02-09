@@ -14,10 +14,6 @@ STATE_DIR="$HOME/System_Scripts"
 STATE_FILE="$STATE_DIR/last_boot.json"
 mkdir -p "$STATE_DIR"
 
-command -v nvme >/dev/null 2>&1 || exit 0
-command -v smartctl >/dev/null 2>&1 || exit 0
-command -v jq >/dev/null 2>&1 || exit 0
-
 # ================= WAIT FOR NETWORK =================
 wait_for_network SSD_WRITES
 sleep 10
