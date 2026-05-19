@@ -17,7 +17,7 @@ while true; do \
   echo "[mount-cifs] Network not ready, retrying in 5s..."; \
   sleep 5; \
 done'
-ExecStart=/usr/sbin/mount.cifs  //100.96.0.105/data /net/shared_files -o username=hpserver,password=q,vers=3.0,uid=1000,gid=1000
+ExecStart=/usr/sbin/mount.cifs  //100.96.0.105/data /net/shared_files -o credentials=/etc/samba/credentials/tailscale-cifs,vers=3.0,uid=1000,gid=1000
 ExecStop=/bin/umount /net/shared_files
 RemainAfterExit=true
 

@@ -1,0 +1,14 @@
+Create:
+
+sudo mkdir -p /etc/samba/credentials
+sudo nano /etc/samba/credentials/tailscale-cifs
+
+Contents:
+
+username=hpserver
+password=YOUR_STRONG_PASSWORD
+
+Then secure it:
+
+sudo chmod 600 /etc/samba/credentials/tailscale-cifs
+sudo chown root:root /etc/samba/credentials/tailscale-cifs
